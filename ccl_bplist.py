@@ -82,7 +82,7 @@ def __decode_multibyte_int(b, signed=True):
         return result
     else:
         raise BplistError("Cannot decode multibyte int of length {0}".format(len(b)))
-    
+
     if signed and len(b) > 1:
         return struct.unpack(fmt.lower(), b)[0]
     else:
@@ -106,10 +106,7 @@ def __decode_object(f, offset, collection_offset_size, offset_table):
     #print("Decoding object at offset {0}".format(offset))
     f.seek(offset)
     # A little hack to keep the script portable between py2.x and py3k
-    if sys.version_info[0] < 3:
-        type_byte = ord(f.read(1)[0])
-    else:
-        type_byte = f.read(1)[0]
+    type_byte = ord(f.read(1)[0]) if sys.version_info[0] < 3 else f.read(1)[0]
     #print("Type byte: {0}".format(hex(type_byte)))
     if type_byte == 0x00: # Null      0000 0000
         return None
@@ -141,10 +138,7 @@ def __decode_object(f, offset, collection_offset_size, offset_table):
             data_length = type_byte & 0x0F
         else:
             # A little hack to keep the script portable between py2.x and py3k
-            if sys.version_info[0] < 3:
-                int_type_byte = ord(f.read(1)[0])
-            else:
-                int_type_byte = f.read(1)[0]
+            int_type_byte = ord(f.read(1)[0]) if sys.version_info[0] < 3 else f.read(1)[0]
             if int_type_byte & 0xF0 != 0x10:
                 raise BplistError("Long Data field definition not followed by int type at offset {0}".format(f.tell()))
             int_length = 2 ** (int_type_byte & 0x0F)
@@ -157,10 +151,7 @@ def __decode_object(f, offset, collection_offset_size, offset_table):
             ascii_length = type_byte & 0x0F
         else:
             # A little hack to keep the script portable between py2.x and py3k
-            if sys.version_info[0] < 3:
-                int_type_byte = ord(f.read(1)[0])
-            else:
-                int_type_byte = f.read(1)[0]
+            int_type_byte = ord(f.read(1)[0]) if sys.version_info[0] < 3 else f.read(1)[0]
             if int_type_byte & 0xF0 != 0x10:
                 raise BplistError("Long ASCII field definition not followed by int type at offset {0}".format(f.tell()))
             int_length = 2 ** (int_type_byte & 0x0F)
@@ -173,10 +164,7 @@ def __decode_object(f, offset, collection_offset_size, offset_table):
             utf16_length = (type_byte & 0x0F) * 2 # Length is characters - 16bit width
         else:
             # A little hack to keep the script portable between py2.x and py3k
-            if sys.version_info[0] < 3:
-                int_type_byte = ord(f.read(1)[0])
-            else:
-                int_type_byte = f.read(1)[0]
+            int_type_byte = ord(f.read(1)[0]) if sys.version_info[0] < 3 else f.read(1)[0]
             if int_type_byte & 0xF0 != 0x10:
                 raise BplistError("Long UTF-16 field definition not followed by int type at offset {0}".format(f.tell()))
             int_length = 2 ** (int_type_byte & 0x0F)
@@ -193,18 +181,17 @@ def __decode_object(f, offset, collection_offset_size, offset_table):
             array_count = type_byte & 0x0F
         else:
             # A little hack to keep the script portable between py2.x and py3k
-            if sys.version_info[0] < 3:
-                int_type_byte = ord(f.read(1)[0])
-            else:
-                int_type_byte = f.read(1)[0]
+            int_type_byte = ord(f.read(1)[0]) if sys.version_info[0] < 3 else f.read(1)[0]
             if int_type_byte & 0xF0 != 0x10:
                 raise BplistError("Long Array field definition not followed by int type at offset {0}".format(f.tell()))
             int_length = 2 ** (int_type_byte & 0x0F)
             int_bytes = f.read(int_length)
             array_count = __decode_multibyte_int(int_bytes, signed=False)
-        array_refs = []
-        for i in range(array_count):
-            array_refs.append(__decode_multibyte_int(f.read(collection_offset_size), False))
+        array_refs = [
+            __decode_multibyte_int(f.read(collection_offset_size), False)
+            for _ in range(array_count)
+        ]
+
         return [__decode_object(f, offset_table[obj_ref], collection_offset_size, offset_table) for obj_ref in array_refs]
     elif type_byte & 0xF0 == 0xC0: # Set  1010 nnnn
         if type_byte & 0x0F != 0x0F:
@@ -212,18 +199,17 @@ def __decode_object(f, offset, collection_offset_size, offset_table):
             set_count = type_byte & 0x0F
         else:
             # A little hack to keep the script portable between py2.x and py3k
-            if sys.version_info[0] < 3:
-                int_type_byte = ord(f.read(1)[0])
-            else:
-                int_type_byte = f.read(1)[0]
+            int_type_byte = ord(f.read(1)[0]) if sys.version_info[0] < 3 else f.read(1)[0]
             if int_type_byte & 0xF0 != 0x10:
                 raise BplistError("Long Set field definition not followed by int type at offset {0}".format(f.tell()))
             int_length = 2 ** (int_type_byte & 0x0F)
             int_bytes = f.read(int_length)
             set_count = __decode_multibyte_int(int_bytes, signed=False)
-        set_refs = []
-        for i in range(set_count):
-            set_refs.append(__decode_multibyte_int(f.read(collection_offset_size), False))
+        set_refs = [
+            __decode_multibyte_int(f.read(collection_offset_size), False)
+            for _ in range(set_count)
+        ]
+
         return [__decode_object(f, offset_table[obj_ref], collection_offset_size, offset_table) for obj_ref in set_refs]
     elif type_byte & 0xF0 == 0xD0: # Dict  1011 nnnn
         if type_byte & 0x0F != 0x0F:
@@ -231,24 +217,23 @@ def __decode_object(f, offset, collection_offset_size, offset_table):
             dict_count = type_byte & 0x0F
         else:
             # A little hack to keep the script portable between py2.x and py3k
-            if sys.version_info[0] < 3:
-                int_type_byte = ord(f.read(1)[0])
-            else:
-                int_type_byte = f.read(1)[0]
+            int_type_byte = ord(f.read(1)[0]) if sys.version_info[0] < 3 else f.read(1)[0]
             #print("Dictionary length int byte: {0}".format(hex(int_type_byte)))
             if int_type_byte & 0xF0 != 0x10:
                 raise BplistError("Long Dict field definition not followed by int type at offset {0}".format(f.tell()))
             int_length = 2 ** (int_type_byte & 0x0F)
             int_bytes = f.read(int_length)
             dict_count = __decode_multibyte_int(int_bytes, signed=False)
-        key_refs = []
-        #print("Dictionary count: {0}".format(dict_count))
-        for i in range(dict_count):
-            key_refs.append(__decode_multibyte_int(f.read(collection_offset_size), False))
-        value_refs = []
-        for i in range(dict_count):
-            value_refs.append(__decode_multibyte_int(f.read(collection_offset_size), False))
-        
+        key_refs = [
+            __decode_multibyte_int(f.read(collection_offset_size), False)
+            for _ in range(dict_count)
+        ]
+
+        value_refs = [
+            __decode_multibyte_int(f.read(collection_offset_size), False)
+            for _ in range(dict_count)
+        ]
+
         dict_result = {}
         for i in range(dict_count):
             #print("Key ref: {0}\tVal ref: {1}".format(key_refs[i], value_refs[i]))
@@ -275,10 +260,11 @@ def load(f):
 
     # Read offset table
     f.seek(offest_table_offset)
-    offset_table = []
-    for i in range(object_count):
-        offset_table.append(__decode_multibyte_int(f.read(offset_int_size), False))
-    
+    offset_table = [
+        __decode_multibyte_int(f.read(offset_int_size), False)
+        for _ in range(object_count)
+    ]
+
     return __decode_object(f, offset_table[top_level_object_index], collection_offset_size, offset_table)
 
 
@@ -326,10 +312,7 @@ def NSKeyedArchiver_convert(o, object_table):
         #return o
         result = o
 
-    if _object_converter:
-        return _object_converter(result)
-    else:
-        return result
+    return _object_converter(result) if _object_converter else result
 
 
 class NsKeyedArchiverDictionary(dict):
@@ -370,7 +353,7 @@ def deserialise_NsKeyedArchiver(obj, parse_whole_structure=False):
     """Deserialises an NSKeyedArchiver bplist rebuilding the structure.
        obj should usually be the top-level object returned by the load()
        function."""
-    
+
     # Check that this is an archiver and version we understand
     if not isinstance(obj, dict):
         raise TypeError("obj must be a dict")
@@ -393,23 +376,18 @@ def is_nsmutabledictionary(obj):
         return False
     if obj["$class"].get("$classname") not in ("NSMutableDictionary", "NSDictionary"):
         return False
-    if "NS.keys" not in obj.keys():
-        return False
-    if "NS.objects" not in obj.keys():
-        return False
-
-    return True
+    return False if "NS.keys" not in obj.keys() else "NS.objects" in obj.keys()
     
 def convert_NSMutableDictionary(obj):
     """Converts a NSKeyedArchiver serialised NSMutableDictionary into
        a straight dictionary (rather than two lists as it is serialised
        as)"""
-    
+
     # The dictionary is serialised as two lists (one for keys and one
     # for values) which obviously removes all convenience afforded by
     # dictionaries. This function converts this structure to an 
     # actual dictionary so that values can be accessed by key.
-    
+
     if not is_nsmutabledictionary(obj):
         raise ValueError("obj does not have the correct structure for a NSDictionary/NSMutableDictionary serialised to a NSKeyedArchiver")
     keys = obj["NS.keys"]
@@ -428,7 +406,7 @@ def convert_NSMutableDictionary(obj):
         if k in result:
             raise ValueError("The 'NS.keys' list contains duplicate entries")
         result[k] = vals[i]
-    
+
     return result
 
 # NSArray convenience functions
@@ -439,10 +417,7 @@ def is_nsarray(obj):
         return False
     if obj["$class"].get("$classname") not in ("NSArray", "NSMutableArray"):
         return False
-    if "NS.objects" not in obj.keys():
-        return False
-
-    return True
+    return "NS.objects" in obj.keys()
 
 def convert_NSArray(obj):
     if not is_nsarray(obj):
@@ -458,10 +433,7 @@ def is_isnsset(obj):
         return False
     if obj["$class"].get("$classname") not in ("NSSet", "NSMutableSet"):
         return False
-    if "NS.objects" not in obj.keys():
-        return False
-
-    return True
+    return "NS.objects" in obj.keys()
 
 def convert_NSSet(obj):
     if not is_isnsset(obj):
@@ -477,9 +449,7 @@ def is_nsstring(obj):
         return False
     if obj["$class"].get("$classname") not in ("NSString", "NSMutableString"):
         return False
-    if "NS.string" not in obj.keys():
-        return False
-    return True
+    return "NS.string" in obj.keys()
 
 def convert_NSString(obj):
     if not is_nsstring(obj):
@@ -495,10 +465,7 @@ def is_nsdate(obj):
         return False
     if obj["$class"].get("$classname") not in ("NSDate"):
         return False
-    if "NS.time" not in obj.keys():
-        return False
-
-    return True
+    return "NS.time" in obj.keys()
 
 def convert_NSDate(obj):
     if not is_nsdate(obj):
